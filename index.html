@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Random Wheel Spinner</title>
+  <style>
+    body {
+      margin: 0;
+      background: #08163f;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 24px;
+      font-size: 64px;
+      font-weight: 800;
+    }
+
+    #wheelContainer {
+      position: relative;
+      width: 720px;
+      margin: 20px auto 0;
+    }
+
+    canvas {
+      border-radius: 50%;
+    }
+
+    #pointer {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 22px solid transparent;
+      border-right: 22px solid transparent;
+      border-top: 42px solid white;
+      z-index: 10;
+    }
+
+    button {
+      margin-top: 30px;
+      padding: 18px 42px;
+      font-size: 28px;
+      border: none;
+      border-radius: 14px;
+      background: #1db954;
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover {
+      background: #18a34a;
+    }
+
+    #result {
+      margin-top: 30px;
+      font-size: 44px;
+      font-weight: 800;
+      min-height: 56px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Random Wheel Spinner</h1>
+
+  <div id="wheelContainer">
+    <div id="pointer"></div>
+    <canvas id="wheel" width="720" height="720"></canvas>
+  </div>
+
+  <button id="spinButton">SPIN</button>
+  <div id="result"></div>
+
+  <script>
+    let names = ["nathan","caelan","john","ben","grady","Dillon","eshan","mason","toby"];
+    let scripted = ["nathan","caelan","john","ben","grady","Dillon","eshan","mason","toby"];
+
+    let rotation = 0;
+    let spinning = false;
+    let pickIndex = 0;
+    let pendingRemovalName = null;
+
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const result = document.getElementById("result");
+    const spinButton = document.getElementById("spinButton");
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = 330;
+
+    function drawWheel() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (names.length === 0) {
+        return;
+      }
+
+      const arc = (Math.PI * 2) / names.length;
+
+      for (let i = 0; i < names.length; i++) {
+        const start = rotation + i * arc;
+        const end = start + arc;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = `hsl(${(i * 360) / names.length}, 70%, 55%)`;
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + arc / 2);
+        ctx.fillStyle = "white";
+        ctx.font = "bold 24px Arial";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(names[i], radius - 35, 0);
+        ctx.restore();
+      }
+    }
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function spin() {
+      if (spinning) return;
+
+      if (pendingRemovalName !== null) {
+        names = names.filter(name => name !== pendingRemovalName);
+        pendingRemovalName = null;
+        drawWheel();
+      }
+
+      if (pickIndex >= scripted.length || names.length === 0) {
+        result.textContent = "All names picked";
+        return;
+      }
+
+      const target = scripted[pickIndex];
+      const index = names.indexOf(target);
+
+      if (index === -1) {
+        pickIndex++;
+        spin();
+        return;
+      }
+
+      spinning = true;
+
+      const arc = (Math.PI * 2) / names.length;
+
+      // Top arrow points to -PI/2.
+      // We want the CENTER of the chosen slice under that arrow.
+      const desiredRotation =
+        (-Math.PI / 2) - (index * arc + arc / 2);
+
+      const currentNormalized =
+        ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+      let targetNormalized =
+        ((desiredRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+      let delta = targetNormalized - currentNormalized;
+      if (delta < 0) {
+        delta += Math.PI * 2;
+      }
+
+      const extraSpins = Math.PI * 2 * 6;
+      const startRotation = rotation;
+      const endRotation = rotation + extraSpins + delta;
+
+      const duration = 3200;
+      let startTime = null;
+
+      function animate(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const eased = easeOutCubic(t);
+
+        rotation = startRotation + (endRotation - startRotation) * eased;
+        drawWheel();
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          rotation = endRotation;
+          drawWheel();
+          result.textContent = target + " selected";
+          pendingRemovalName = target;
+          pickIndex++;
+          spinning = false;
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    spinButton.addEventListener("click", spin);
+    drawWheel();
+  </script>
+</body>
+</html>
